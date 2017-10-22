@@ -1,0 +1,419 @@
+'set-up:
+'chef has to make sure that he has ONLY the desired reporting day's labor hours and daily sales files in his Labor HoursANDRev outLook folders
+'make sure chef has ms outlook library clicked under tools / reference
+'make sure the Chef is receiving the daily labor hours report, and the the daily sales report
+'Create a subfolder in outLook called "LaborHoursAndRev"
+'Create a subfolder in outLook called "OldLaborHoursAndRev"
+'have the Chef create a rule in OutLook that forwards LaborHours reports and the Sales Report into the "LaborHoursAndRev" outLook folder
+'Change the strFolder variable to equal the folder where Chef's labor hours and sales Data excel files are located, he will need to make a folder to store them in, preferably desktop folder
+
+
+Sub StartOutlookAndGetLH()
+    On Error GoTo Error_Handler
+    Dim oOutlook        As Object
+    Dim sAPPPath        As String
+ 
+    If IsAppRunning("Outlook.Application") = True Then    'Outlook was already running
+        Set oOutlook = GetObject(, "Outlook.Application")    'Bind to existing instance of Outlook
+    Else    'Could not get instance of Outlook, so create a new one
+        sAPPPath = GetAppExePath("outlook.exe")    'determine outlook's installation path
+        Shell (sAPPPath)    'start outlook
+        Do While Not IsAppRunning("Outlook.Application")
+            DoEvents
+        Loop
+        Set oOutlook = GetObject(, "Outlook.Application")    'Bind to existing instance of Outlook
+    End If
+ 
+    Const olMailItem = 0
+    Dim oOutlookMsg     As Object
+
+    
+
+Call getLH
+
+
+Error_Handler_Exit:
+    On Error Resume Next
+    Set oOutlook = Nothing
+    Exit Sub
+ 
+Error_Handler:
+    MsgBox "The following error has occured" & vbCrLf & vbCrLf & _
+           "Error Number: " & Err.Number & vbCrLf & _
+           "Error Source: StartOutlook" & vbCrLf & _
+           "Error Description: " & Err.Description _
+           , vbOKOnly + vbCritical, "An Error has Occured!"
+    Resume Error_Handler_Exit
+     
+   
+    
+End Sub
+ 
+
+Function IsAppRunning(sApp As String) As Boolean
+    On Error GoTo Error_Handler
+    Dim oApp            As Object
+ 
+    Set oApp = GetObject(, sApp)
+    IsAppRunning = True
+ 
+Error_Handler_Exit:
+    On Error Resume Next
+    Set oApp = Nothing
+    Exit Function
+ 
+Error_Handler:
+    Resume Error_Handler_Exit
+End Function
+ 
+Function GetAppExePath(ByVal sExeName As String) As String
+    On Error GoTo Error_Handler
+    Dim WSHShell        As Object
+ 
+    Set WSHShell = CreateObject("Wscript.Shell")
+    GetAppExePath = WSHShell.RegRead("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" & sExeName & "\")
+ 
+Error_Handler_Exit:
+    On Error Resume Next
+    Set WSHShell = Nothing
+    Exit Function
+ 
+Error_Handler:
+    If Err.Number = -2147024894 Then
+        'Cannot locate requested exe????
+    Else
+        MsgBox "The following error has occured." & vbCrLf & vbCrLf & _
+               "Error Number: " & Err.Number & vbCrLf & _
+               "Error Source: GetAppExePath" & vbCrLf & _
+               "Error Description: " & Err.Description, _
+               vbCritical, "An Error has Occured!"
+    End If
+    Resume Error_Handler_Exit
+End Function
+
+
+Sub getLH()
+
+
+Dim OlApp As New Outlook.Application
+    Dim OlMail As Outlook.MailItem
+    Dim OlItems As Outlook.Items
+    Dim OlFolder As Outlook.MAPIFolder
+    Dim i As Integer
+    
+    Dim strFolder As String
+    Dim mySaveName As String
+    Dim myExt As String
+
+
+'below is the folder that the Labor Hours report is saved into
+    strFolder = "\\wgi.local\whg corporate\WHG Home Folders\jared.dahlke\Desktop\chefTest\"
+    
+    On Error Resume Next
+    Set OlApp = GetObject(, "Outlook.Application")
+    
+    If Err.Number = 429 Then
+        Set OlApp = CreateObject("Outlook.application")
+    End If
+    
+
+
+MailCount = 1
+            
+While MailCount > 0
+            
+                
+    
+    'check only within the "LaborHours" outLook subfolder
+    Set OlFolder = OlApp.Session.GetDefaultFolder(olFolderInbox).Folders("LaborHoursAndRev")
+    Set olFolderMove = OlApp.Session.GetDefaultFolder(olFolderInbox).Folders("OldLaborHoursAndRev")
+    Set OlItems = OlFolder.Items
+     
+    
+    
+        
+    
+                
+                'While MailCount > 0
+                For Each OlItems In OlApp
+                    For Each OlMail In OlItems
+                        
+                        
+                        
+                                'check for attachments
+                                If OlMail.Attachments.Count > 0 Then
+                                
+                                    'loop through all attachments
+                                    For i = 1 To OlMail.Attachments.Count
+                                        
+                                        mySaveName = OlMail.Attachments.Item(i).FileName
+                                        myExt = Split(mySaveName, ".")(1)
+                                        
+                                        'Only save files with named extensions
+                                        Select Case myExt
+                                            Case "xls", "xlsm", "xlsx"
+                                                mySaveName = strFolder & "\" & mySaveName
+                                                OlMail.Attachments.Item(i).SaveAsFile mySaveName
+                                                'move the the attachment so it's not picked up again
+                                                OlItems.Item(i).Move olFolderMove
+                                                
+                                                
+                                                
+                                            
+                                            Case Else
+                                                'do nothing
+                                        End Select
+                                        
+                                    Next
+                                    
+                                End If
+                        
+                        
+                    
+                   
+                    
+                
+                     Next OlMail
+                     
+              Next OlItems
+              
+              
+ 
+    
+    MailCount = OlItems.Count
+    
+   
+
+Wend
+
+
+Call prepareReport
+
+
+
+
+End Sub
+
+
+Sub prepareReport()
+'opening declarations
+Application.ScreenUpdating = False
+Application.DisplayAlerts = False
+
+
+
+
+
+'this procedure opens the  labor hours and daily sales report:--------------------------------------------------------------------------------
+
+'name the strfolder variable
+strFolder = "\\wgi.local\whg corporate\WHG Home Folders\jared.dahlke\Desktop\chefTest\"
+
+            'error checker to make sure he has 2 and only 2 files in the folder in Network Drive
+            Set fso = CreateObject("Scripting.FileSystemObject")
+            Set objFiles = fso.GetFolder(strFolder).Files
+            FileCount = objFiles.Count
+            If FileCount <> 2 Then
+                MsgBox "Make sure you have ONLY ONE of the WRSD Daily file and the Labor Hours file in:  " & strFolder & ".  Then run the report again. If you have more than 2 reports in this folder it might be because your 'LaborHourAndRev outLook folder has too many files in it. Double check that then try to run the report again."
+                
+                Exit Sub
+            End If
+            Set objFiles = Nothing
+            Set fso = Nothing
+            Set obj = Nothing
+
+
+On Error GoTo ErrHandler1:
+                
+    'name the file that you want to open myfile
+    myfile = strFolder & "Food" & "*.xls"
+        
+        
+    'open the labor hours file
+    Application.Workbooks.Open FileName:=myfile
+    'assign a variable name to the labor hours file
+    LaborHourData = ActiveWorkbook.Name
+    
+
+On Error GoTo ErrHandler2:
+
+    myfile2 = strFolder & "WRSD" & "*.xlsm"
+                
+    'open the daily sales file
+    Application.Workbooks.Open FileName:=myfile2
+    'assign a variable name to the sales file
+    DailySalesData = ActiveWorkbook.Name
+
+
+
+'this procedure deletes the old data in the labor hours section and replaces it with the new data:---------------------------------------------
+On Error GoTo ErrHandlerLast:
+
+'select primary report and clear old labor hours data
+ThisWorkbook.Sheets("Labor Hours").Activate
+Columns("A:K").Cells.Clear
+
+'select primary report and clear old daily sales
+ThisWorkbook.Sheets("SalesData").Activate
+Columns("B:O").Cells.Clear
+
+
+
+
+
+'select laborhourdata and make sure formatting hasn't changed
+Workbooks(LaborHourData).Activate
+If Range("k1") <> "COUNT" Then
+    GoTo WrongFormatError:
+End If
+
+If Range("b1") <> "IDNAME" Then
+    GoTo WrongFormatError:
+End If
+If Range("c1") <> "Reg Hours" Then
+    GoTo WrongFormatError:
+End If
+
+
+
+
+'select laborHourData and copy relevant range
+Workbooks(LaborHourData).Activate
+Columns("A:K").Copy
+
+'select primary report and paste into relevant range
+ThisWorkbook.Sheets("Labor Hours").Activate
+Range("a1").Select
+
+Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+                        :=False, Transpose:=False
+
+
+'close laborhourdata workbook
+Workbooks(LaborHourData).Close
+
+'this procedure retrieves the daily sales figures from the daily sales report and puts them into the chef's report:----------------------------------
+
+
+'activate sales data workbook and copy relevant data
+Workbooks(DailySalesData).Activate
+
+'check to make sure the comparative tab still exists on the daily sales report
+On Error GoTo SheetStructureError:
+'activate the comparrative tab
+ActiveWorkbook.Sheets("Comparative").Activate
+
+
+'Confirm that the format of the sales sheet is still valid
+    If Range("b5") <> "TODAY" Then
+        MsgBox "The format of the daily sales file has changed, contact the Night Audit team and/or the accounting manager to find out why they changed the report"
+        Exit Sub
+    End If
+    
+    If Range("b6") <> "Actual" Then
+        MsgBox "The format of the daily sales file has changed, contact the Night Audit team and/or the accounting manager to find out why they changed the report"
+        Exit Sub
+    End If
+    
+    If Range("e30") <> " WRSD  Revenue Comparative" Then
+        MsgBox "The format of the daily sales file has changed, contact the Night Audit team and/or the accounting manager to find out why they changed the report"
+        Exit Sub
+    End If
+    
+    If Range("e32") <> "Canyon Grille Revenue" Then
+        MsgBox "The format of the daily sales file has changed, contact the Night Audit team and/or the accounting manager to find out why they changed the report"
+        Exit Sub
+    End If
+    
+    If Range("e36") <> "Kiosk Sales Revenue" Then
+        MsgBox "The format of the daily sales file has changed, contact the Night Audit team and/or the accounting manager to find out why they changed the report"
+        Exit Sub
+    End If
+
+     If Range("e37") <> "Beverage Revenue" Then
+        MsgBox "The format of the daily sales file has changed, contact the Night Audit team and/or the accounting manager to find out why they changed the report"
+        Exit Sub
+    End If
+    
+    If Range("e38") <> "Pizza Hut Revenue" Then
+        MsgBox "The format of the daily sales file has changed, contact the Night Audit team and/or the accounting manager to find out why they changed the report"
+        Exit Sub
+    End If
+    
+    If Range("e49") <> "Market Revenue" Then
+        MsgBox "The format of the daily sales file has changed, contact the Night Audit team and/or the accounting manager to find out why they changed the report"
+        Exit Sub
+    End If
+
+
+'reset the error handler to last handler
+On Error GoTo ErrHandlerLast:
+
+
+
+'copy the comparative tab to the chefs report
+Columns("A:O").Copy
+
+'select primary report and paste into relevant range
+ThisWorkbook.Sheets("SalesData").Activate
+Range("a1").Select
+
+Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+                        :=False, Transpose:=False
+
+
+'close sales data wb
+Workbooks(DailySalesData).Close
+
+
+'hide the Labor Hours and Salesdata tabs
+ThisWorkbook.Sheets("Labor Hours").Visible = False
+ThisWorkbook.Sheets("SalesData").Visible = False
+
+
+'show the summary tab
+ThisWorkbook.Sheets("Summary").Activate
+
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''-------------------------------------------------------------------------------------
+'Exit Procedures
+
+ExitSub:
+'delete both data files in the network drive
+Kill myfile
+Kill myfile2
+
+
+'update screen and give completion message
+Application.ScreenUpdating = True
+MsgBox "Your report is ready"
+Exit Sub
+
+
+'Error handlers---------------------------------------------------------------------------------------------------------------------------
+
+ErrHandler1:
+MsgBox "make sure you have the labor hour file saved in: " & strFolder
+Exit Sub
+
+ErrHandler2:
+MsgBox "make sure you have the Daily Sales file saved in: " & strFolder
+Exit Sub
+
+WrongFormatError:
+MsgBox "Error: The format of the Labor Hour report has changed. Check with the Payroll manager at corporate to figure out what happened."
+Exit Sub
+
+SheetStructureError:
+MsgBox "Error: The format of the Daily Sales report has changed. The 'Comparative' tab is missing. Check with the Night Audit team or the Accounting Manager to figure out what happened."
+Exit Sub
+
+
+ErrHandlerLast:
+MsgBox "Error number 10, please report this to the accounting manager"
+Exit Sub
+
+
+End Sub
+
+
